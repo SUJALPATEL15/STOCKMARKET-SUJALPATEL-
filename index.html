@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Indian Stock Predictor — Ultimate</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .loader { border: 5px solid #f3f3f3; border-top: 5px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .live-dot { width:10px; height:10px; border-radius:50%; display:inline-block; margin-left:8px; }
+        .positive { background: #16a34a; } .negative { background: #ef4444; }
+        .toggle-switch { display:inline-flex; align-items:center; gap:8px; }
+        .mini-card { min-height:68px; }
+        .chart-download { cursor:pointer; }
+        .chip { padding:4px 8px; border-radius:9999px; background:#1118271A; }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="text-center mb-6">
+            <h1 class="text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-teal-300">Indian Stock Predictor — Ultimate 🇮🇳</h1>
+            <p class="text-gray-400 mt-2">Enter NSE ticker (RELIANCE.NS or RELIANCE). Includes watchlist, indicators, news/sentiment, comparison, export & more.</p>
+        </header>
+
+        <!-- Search & Controls -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center mb-6">
+            <div class="col-span-2">
+                <div class="flex rounded-lg shadow-lg bg-gray-800 border border-gray-700 overflow-hidden">
+                    <input id="tickerInput" class="w-full bg-gray-800 text-white p-4 focus:outline-none" placeholder="Enter Stock Ticker (e.g., RELIANCE.NS or RELIANCE)">
+                    <button id="searchBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 transition duration-300">Search</button>
+                    <button id="voiceBtn" title="Voice search (Web Speech API)" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4">🎤</button>
+                </div>
+                <div class="flex gap-2 mt-2 text-xs text-gray-400 items-center">
+                    <div class="chip">Auto-refresh: <select id="autoRefreshSelect" class="bg-transparent text-gray-200 outline-none ml-2"><option value="0">Off</option><option value="30">30s</option><option value="60" selected>60s</option><option value="300">5m</option></select></div>
+                    <div class="chip">Range: <select id="rangeSelect" class="bg-transparent text-gray-200 outline-none ml-2"><option value="1m">1M</option><option value="3m">3M</option><option value="6m">6M</option><option value="1y" selected>1Y</option><option value="5y">5Y</option></select></div>
+                    <div class="chip">Currency: <select id="currencySelect" class="bg-transparent text-gray-200 outline-none ml-2"><option value="INR" selected>INR (₹)</option><option value="USD">USD ($)</option></select></div>
+                </div>
+            </div>
+
+            <div class="flex gap-2 justify-end">
+                <button id="addWatchBtn" class="bg-yellow-500 hover:bg-yellow-600 text-black font-bold py-2 px-4 rounded">⭐ Add to Watchlist</button>
+                <button id="openWatchBtn" class="bg-gray-800 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded">Watchlist</button>
+            </div>
+        </div>
+
+        <!-- Result Section -->
+        <main id="resultSection" class="bg-gray-800 p-6 rounded-lg shadow-2xl border border-gray-700 hidden">
+            <div id="loader" class="loader hidden"></div>
+            <div id="messageBox" class="text-center mt-4 text-red-400"></div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 items-start">
+                <div id="stockDetails" class="p-4 bg-gray-700 rounded-lg">
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <h2 id="stockName" class="text-2xl font-bold mb-1"></h2>
+                            <p id="stockTicker" class="text-sm text-blue-400 mb-2"></p>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-sm">Live</div>
+                            <div id="liveDot" class="live-dot positive"></div>
+                        </div>
+                    </div>
+
+                    <div class="mt-3">
+                        <div class="text-2xl font-semibold" id="currentPrice">₹ --</div>
+                        <div class="text-sm text-gray-400 mt-1">Change: <span id="priceChange" class="font-medium">--</span></div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 text-sm mt-4">
+                        <p><strong>Exchange:</strong> <span id="exchange">N/A</span></p>
+                        <p><strong>Sector:</strong> <span id="sector">N/A</span></p>
+                        <p><strong>Country:</strong> <span id="country">N/A</span></p>
+                        <p><strong>Market Cap:</strong> <span id="marketCap">N/A</span></p>
+                    </div>
+
+                    <h3 class="text-sm font-semibold mt-4">Business Summary</h3>
+                    <p id="description" class="text-gray-300 text-sm max-h-32 overflow-auto"></p>
+
+                    <div class="mt-4 flex gap-2">
+                        <button id="compareBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white py-1 px-3 rounded">Compare</button>
+                        <button id="downloadChartBtn" class="bg-green-600 hover:bg-green-700 text-white py-1 px-3 rounded chart-download">Download Chart</button>
+                        <button id="exportCsvBtn" class="bg-gray-700 hover:bg-gray-600 text-white py-1 px-3 rounded">Export CSV</button>
+                    </div>
+
+                    <div class="mt-4">
+                        <label class="text-xs text-gray-400">Model / Confidence</label>
+                        <div class="text-sm">Model: <span id="modelName">LSTM (demo)</span> • Confidence: <span id="modelConf">--</span></div>
+                        <div class="mt-2 text-xs text-gray-400">Prediction Interval: <input id="intervalRange" type="range" min="0" max="10" value="2"></div>
+                    </div>
+                </div>
+
+                <!-- Performance Cards -->
+                <div class="md:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div class="mini-card bg-gray-700 p-3 rounded text-center">
+                        <div class="text-xs text-gray-400">1D Change</div>
+                        <div id="ch1d" class="text-lg font-semibold">--</div>
+                    </div>
+                    <div class="mini-card bg-gray-700 p-3 rounded text-center">
+                        <div class="text-xs text-gray-400">1W Change</div>
+                        <div id="ch1w" class="text-lg font-semibold">--</div>
+                    </div>
+                    <div class="mini-card bg-gray-700 p-3 rounded text-center">
+                        <div class="text-xs text-gray-400">1M Change</div>
+                        <div id="ch1m" class="text-lg font-semibold">--</div>
+                    </div>
+                    <div class="mini-card bg-gray-700 p-3 rounded text-center">
+                        <div class="text-xs text-gray-400">52W Range</div>
+                        <div id="range52" class="text-lg font-semibold">--</div>
+                    </div>
+
+                    <div class="mini-card bg-gray-700 p-3 rounded text-center">
+                        <div class="text-xs text-gray-400">PE Ratio</div>
+                        <div id="peRatio" class="text-lg font-semibold">--</div>
+                    </div>
+                    <div class="mini-card bg-gray-700 p-3 rounded text-center">
+                        <div class="text-xs text-gray-400">Revenue (TTM)</div>
+                        <div id="revenue" class="text-lg font-semibold">--</div>
+                    </div>
+                    <div class="mini-card bg-gray-700 p-3 rounded text-center">
+                        <div class="text-xs text-gray-400">RSI (14)</div>
+                        <div id="rsi14" class="text-lg font-semibold">--</div>
+                    </div>
+                    <div class="mini-card bg-gray-700 p-3 rounded text-center">
+                        <div class="text-xs text-gray-400">MACD</div>
+                        <div id="macdVal" class="text-lg font-semibold">--</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chart Area -->
+            <h3 class="text-xl font-semibold text-center mb-4 text-teal-300">Historical & 7-Day Forecast</h3>
+            <div id="chartContainer" class="w-full h-96 bg-gray-900 p-4 rounded">
+                <canvas id="stockChart"></canvas>
+            </div>
+
+            <!-- News & Sentiment -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                <div class="bg-gray-700 p-4 rounded">
+                    <h4 class="font-semibold">Top News</h4>
+                    <div id="newsList" class="mt-2 text-sm text-gray-300 max-h-48 overflow-auto"></div>
+                </div>
+                <div class="bg-gray-700 p-4 rounded">
+                    <h4 class="font-semibold">Sentiment</h4>
+                    <div id="sentimentSummary" class="mt-2 text-sm text-gray-300"></div>
+                </div>
+                <div class="bg-gray-700 p-4 rounded">
+                    <h4 class="font-semibold">Model Backtest</h4>
+                    <div id="backtest" class="mt-2 text-sm text-gray-300">Recent model backtest will appear here.</div>
+                </div>
+            </div>
+
+            <!-- Compare Panel (hidden by default) -->
+            <div id="comparePanel" class="mt-6 bg-gray-800 p-4 rounded hidden">
+                <h4 class="font-semibold mb-2">Compare Stocks</h4>
+                <div class="flex gap-2 mb-2">
+                    <input id="compareInput" class="bg-gray-700 p-2 rounded w-full" placeholder="Enter second ticker (e.g., TCS.NS)">
+                    <button id="compareRunBtn" class="bg-indigo-600 hover:bg-indigo-700 py-1 px-3 rounded">Run</button>
+                </div>
+                <div id="compareInfo" class="text-sm text-gray-300">Comparison chart overlays will appear on the main chart.</div>
+            </div>
+
+        </main>
+
+        <!-- Watchlist Modal (basic) -->
+        <div id="watchModal" class="fixed inset-0 bg-black/60 hidden items-center justify-center p-4">
+            <div class="bg-gray-800 p-4 rounded w-full max-w-2xl">
+                <div class="flex justify-between items-center mb-2">
+                    <h4 class="font-semibold">My Watchlist</h4>
+                    <button id="closeWatchBtn" class="text-gray-400">✖</button>
+                </div>
+                <div id="watchItems" class="grid grid-cols-1 md:grid-cols-2 gap-2"></div>
+            </div>
+        </div>
+
+        <footer class="mt-8 text-sm text-gray-500 text-center">Note: This is a demo frontend. Some features require backend endpoints (see notes below).</footer>
+
+    </div>
+
+    <script>
+    /* =====================================================
+       Ultimate Frontend: integrates many features requested
+       - Requires backend endpoints (placeholders included)
+       - Uses localStorage for watchlist and cache
+       ===================================================== */
+
+    const BASE_URL = 'http://127.0.0.1:5000'; // update if your backend URL differs
+    const API_NEWS = 'https://newsapi.org/v2/everything'; // placeholder: needs API key to be used
+
+    // UI elements
+    const searchBtn = document.getElementById('searchBtn');
+    const tickerInput = document.getElementById('tickerInput');
+    const resultSection = document.getElementById('resultSection');
+    const loader = document.getElementById('loader');
+    const messageBox = document.getElementById('messageBox');
+    const stockName = document.getElementById('stockName');
+    const stockTicker = document.getElementById('stockTicker');
+    const currentPriceEl = document.getElementById('currentPrice');
+    const exchangeEl = document.getElementById('exchange');
+    const sectorEl = document.getElementById('sector');
+    const countryEl = document.getElementById('country');
+    const descriptionEl = document.getElementById('description');
+    const priceChangeEl = document.getElementById('priceChange');
+    const liveDot = document.getElementById('liveDot');
+    const addWatchBtn = document.getElementById('addWatchBtn');
+    const openWatchBtn = document.getElementById('openWatchBtn');
+    const watchModal = document.getElementById('watchModal');
+    const closeWatchBtn = document.getElementById('closeWatchBtn');
+    const watchItems = document.getElementById('watchItems');
+    const autoRefreshSelect = document.getElementById('autoRefreshSelect');
+    const rangeSelect = document.getElementById('rangeSelect');
+    const currencySelect = document.getElementById('currencySelect');
+    const downloadChartBtn = document.getElementById('downloadChartBtn');
+    const exportCsvBtn = document.getElementById('exportCsvBtn');
+    const compareBtn = document.getElementById('compareBtn');
+    const comparePanel = document.getElementById('comparePanel');
+    const compareInput = document.getElementById('compareInput');
+    const compareRunBtn = document.getElementById('compareRunBtn');
+    const newsList = document.getElementById('newsList');
+    const sentimentSummary = document.getElementById('sentimentSummary');
+    const modelNameEl = document.getElementById('modelName');
+    const modelConfEl = document.getElementById('modelConf');
+    const intervalRange = document.getElementById('intervalRange');
+    const rsi14El = document.getElementById('rsi14');
+    const macdValEl = document.getElementById('macdVal');
+    const ch1d = document.getElementById('ch1d');
+    const ch1w = document.getElementById('ch1w');
+    const ch1m = document.getElementById('ch1m');
+    const range52 = document.getElementById('range52');
+    const peRatio = document.getElementById('peRatio');
+    const revenue = document.getElementById('revenue');
+    const modelConf = document.getElementById('modelConf');
+
+    // Chart
+    let myChart = null;
+    let autoRefreshTimer = null;
+    let lastTickerSearched = null;
+    let cachedData = {}; // in-memory cache for this session
+
+    // ===== localStorage watchlist helpers =====
+    function getWatchlist() {
+        try { return JSON.parse(localStorage.getItem('watchlist_v1') || '[]'); } catch(e){ return []; }
+    }
+    function saveWatchlist(list){ localStorage.setItem('watchlist_v1', JSON.stringify(list)); }
+    function addToWatchlist(ticker){
+        const list = getWatchlist();
+        if (!list.includes(ticker.toUpperCase())) { list.push(ticker.toUpperCase()); saveWatchlist(list); }
+    }
+    function removeFromWatchlist(ticker){
+        let list = getWatchlist(); list = list.filter(t => t !== ticker.toUpperCase()); saveWatchlist(list);
+    }
+
+    // ===== Utility: format large numbers =====
+    function formatNumber(n){ if (n==null || isNaN(n)) return 'N/A'; if (Math.abs(n) >= 1e12) return (n/1e12).toFixed(2)+'T'; if (Math.abs(n) >= 1e9) return (n/1e9).toFixed(2)+'B'; if (Math.abs(n) >= 1e6) return (n/1e6).toFixed(2)+'M'; return n.toLocaleString(); }
+
+    // ===== Basic fetch wrappers with cache & error handling =====
+    async function safeJson(response){ try { return await response.json(); } catch(e){ return null; } }
+
+    async function fetchStockDetails(ticker){
+        // try cache
+        const key = `details_${ticker}`;
+        if (cachedData[key]) return cachedData[key];
+
+        const res = await fetch(`${BASE_URL}/stock_details?ticker=${encodeURIComponent(ticker)}`);
+        if (!res.ok) { const err = await safeJson(res) || {}; throw new Error(err.error || 'Stock details not found'); }
+        const data = await res.json(); cachedData[key] = data; return data;
+    }
+
+    async function fetchPrediction(ticker, range='1y'){
+        const key = `predict_${ticker}_${range}`;
+        if (cachedData[key]) return cachedData[key];
+        const res = await fetch(`${BASE_URL}/predict?ticker=${encodeURIComponent(ticker)}&range=${range}`);
+        if (!res.ok) { const err = await safeJson(res) || {}; throw new Error(err.error || 'Prediction not available'); }
+        const data = await res.json(); cachedData[key] = data; return data;
+    }
+
+    // News & sentiment (demo). This function will attempt to call a news API if key provided, otherwise returns mocked sample data.
+    async function fetchNewsAndSentiment(ticker) {
+        try {
+            // Replace with your API key or implement sentiment on your backend for production
+            const API_KEY = ''; // <<-- put your NewsAPI/Finnhub key here if you have one
+            if (!API_KEY) throw new Error('No news API key');
+            const response = await fetch(`${API_NEWS}?q=${encodeURIComponent(ticker)}&pageSize=5&apiKey=${API_KEY}`);
+            if (!response.ok) throw new Error('News fetch failed');
+            const json = await response.json();
+            // Very simple sentiment heuristic (title polarity)
+            const articles = json.articles || [];
+            let score = 0;
+            articles.forEach(a => { const t = (a.title||'').toLowerCase(); if (t.includes('gain')||t.includes('up')||t.includes('beats')||t.includes('profit')) score++; if (t.includes('loss')||t.includes('down')||t.includes('fall')||t.includes('decline')) score--; });
+            return { articles, sentimentScore: score };
+        } catch(e) {
+            // fallback demo data
+            const demo = [
+                {title: 'Company announces strategic partnership', source:{name:'Economic Times'}, url:'#'},
+                {title: 'Analyst upgrades stock to buy', source:{name:'Mint'}, url:'#'},
+                {title: 'Quarterly results better than expected', source:{name:'Business Standard'}, url:'#'}
+            ];
+            return { articles: demo, sentimentScore: 2 };
+        }
+    }
+
+    // ===== Indicators implemented in frontend =====
+    function simpleMA(arr, period) {
+        const res = [];
+        for (let i=0;i<arr.length;i++){
+            if (i+1 < period) { res.push(null); continue; }
+            let sum=0; for (let j=i+1-period;j<=i;j++) sum += arr[j]; res.push(sum/period);
+        }
+        return res;
+    }
+
+    function rsi(prices, period=14){
+        if (!prices || prices.length < period+1) return null;
+        const deltas = [];
+        for (let i=1;i<prices.length;i++) deltas.push(prices[i]-prices[i-1]);
+        let gains = 0, losses = 0;
+        for (let i=0;i<period;i++){ const d=deltas[i]; if (d>0) gains+=d; else losses+=Math.abs(d); }
+        let avgGain = gains/period, avgLoss = losses/period;
+        let rsValues = [];
+        rsValues[period-1] = 100 - (100 / (1 + (avgGain/(avgLoss||0.00001))));
+        for (let i=period;i<deltas.length;i++){
+            const d = deltas[i]; avgGain = ((avgGain*(period-1)) + (d>0?d:0))/period; avgLoss = ((avgLoss*(period-1)) + (d<0?Math.abs(d):0))/period; const rs = avgGain/(avgLoss||0.00001); rsValues.push(100 - (100/(1+rs)));
+        }
+        return rsValues.length ? rsValues[rsValues.length-1] : rsValues[0] || null;
+    }
+
+    // MACD basic implementation (12/26/9)
+    function ema(values, period){
+        const k = 2/(period+1); let emaArr = []; let prev = values.slice(0,period).reduce((a,b)=>a+b,0)/period; emaArr[period-1]=prev;
+        for (let i=period;i<values.length;i++){ prev = (values[i]*k)+(prev*(1-k)); emaArr[i]=prev; }
+        return emaArr;
+    }
+    function macd(values){
+        if (!values || values.length < 26) return null;
+        const ema12 = ema(values,12); const ema26 = ema(values,26);
+        const macdLine = [];
+        for (let i=0;i<values.length;i++){ if (ema12[i] && ema26[i]) macdLine[i] = ema12[i] - ema26[i]; else macdLine[i] = null; }
+        const signal = ema(macdLine.filter(v=>v!=null),9); // simplified alignment
+        // return last macd value (rough)
+        const lastMacd = macdLine[macdLine.length-1];
+        return lastMacd != null ? lastMacd.toFixed(3) : null;
+    }
+
+    // ===== Chart rendering =====
+    function renderChart(historicalDates, historicalPrices, forecastDates, forecastPrices, extraDatasets=[]) {
+        const labels = [...historicalDates, ...forecastDates];
+        const lastHistoricalPrice = historicalPrices[historicalPrices.length-1];
+        const forecastSeries = [...Array(historicalPrices.length-1).fill(null), lastHistoricalPrice, ...forecastPrices];
+
+        const datasets = [
+            { label: 'Historical', data: historicalPrices, borderColor: 'rgb(59,130,246)', backgroundColor: 'rgba(59,130,246,0.2)', tension:0.1, pointRadius:0 },
+            { label: '7-Day Forecast', data: forecastSeries, borderColor: 'rgb(16,185,129)', backgroundColor:'rgba(16,185,129,0.2)', borderDash:[6,4], tension:0.1, pointRadius:3 }
+        ];
+        // append extra (MAs) if present
+        extraDatasets.forEach(d=>datasets.push(d));
+
+        const ctx = document.getElementById('stockChart').getContext('2d');
+        if (myChart) myChart.destroy();
+        myChart = new Chart(ctx, {
+            type: 'line',
+            data: { labels, datasets },
+            options: {
+                responsive:true, maintainAspectRatio:false,
+                scales: { x: { ticks:{ color:'#9CA3AF' }, grid:{ color:'#374151' } }, y: { ticks:{ color:'#9CA3AF' }, grid:{ color:'#374151' } } },
+                plugins: { legend: { labels: { color:'#D1D5DB' } } }
+            }
+        });
+    }
+
+    // ===== Display helpers =====
+    function showMessage(msg, isError=true){ messageBox.textContent = msg; messageBox.style.color = isError? '#F87171' : '#34D399'; }
+    function clearMessage(){ messageBox.textContent = ''; }
+
+    function clearDetails(){ stockName.textContent=''; stockTicker.textContent=''; currentPriceEl.textContent='₹ --'; exchangeEl.textContent='N/A'; sectorEl.textContent='N/A'; countryEl.textContent='N/A'; descriptionEl.textContent=''; priceChangeEl.textContent='--'; }
+
+    // ===== CSV export =====
+    function exportToCSV(ticker, historical, forecast) {
+        const rows = [['Date','Close','Type']];
+        historical.forEach(h=>rows.push([h.Date, h.Close, 'historical']));
+        forecast.forEach(f=>rows.push([f.Date, f.Close, 'forecast']));
+        const csv = rows.map(r => r.map(c => '"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');
+        const blob = new Blob([csv],{type:'text/csv'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download = `${ticker}_data.csv`; a.click(); URL.revokeObjectURL(url);
+    }
+
+    // ===== Main flow =====
+    async function performSearch(rawTicker) {
+        const ticker = normalizeTicker(rawTicker || tickerInput.value || '').toUpperCase();
+        if (!ticker) { showMessage('Please enter a stock ticker.'); return; }
+        lastTickerSearched = ticker;
+        resultSection.classList.remove('hidden');
+        loader.classList.remove('hidden');
+        clearMessage();
+        clearDetails();
+
+        try {
+            // 1. Fetch details
+            const details = await fetchStockDetails(ticker);
+            displayStockDetails(details);
+
+            // 2. Fetch prediction/historical
+            const range = rangeSelect.value;
+            const pred = await fetchPrediction(ticker, range);
+
+            // 3. calculate indicators
+            const historical = pred.historical || [];
+            const forecast = pred.forecast || [];
+            const histPrices = historical.map(h=>h.Close);
+            const histDates = historical.map(h=>h.Date);
+            const forDates = forecast.map(f=>f.Date);
+            const forPrices = forecast.map(f=>f.Close);
+
+            // moving averages
+            const ma7 = simpleMA(histPrices,7);
+            const ma30 = simpleMA(histPrices,30);
+            const ma7dataset = { label:'MA(7)', data: ma7, borderColor:'rgb(248,113,113)', borderDash:[2,2], tension:0.1, pointRadius:0 };
+            const ma30dataset = { label:'MA(30)', data: ma30, borderColor:'rgb(99,102,241)', borderDash:[2,2], tension:0.1, pointRadius:0 };
+
+            // rsi & macd
+            const computedRsi = rsi(histPrices,14);
+            const computedMacd = macd(histPrices);
+            rsi14El.textContent = computedRsi ? computedRsi.toFixed(1) : '--';
+            macdValEl.textContent = computedMacd || '--';
+
+            // performance summary
+            computePerformanceCards(historical);
+
+            renderChart(histDates, histPrices, forDates, forPrices, [ma7dataset, ma30dataset]);
+
+            // news & sentiment
+            const news = await fetchNewsAndSentiment(ticker);
+            displayNews(news);
+
+            // model info (from backend if available)
+            modelNameEl.textContent = pred.model || 'LSTM (demo)';
+            modelConfEl.textContent = pred.confidence ? (pred.confidence+'%') : '--';
+
+            // ensure chart download button works after chart created
+            downloadChartBtn.onclick = () => { if (!myChart) return; const url = myChart.toBase64Image(); const a = document.createElement('a'); a.href = url; a.download = `${ticker}_chart.png`; a.click(); };
+
+            exportCsvBtn.onclick = () => exportToCSV(ticker, historical, forecast);
+
+            // compare
+            compareBtn.onclick = () => { comparePanel.classList.toggle('hidden'); }
+            compareRunBtn.onclick = async () => { const t2 = normalizeTicker(compareInput.value); if (!t2) return; await runCompare(ticker, t2); }
+
+            // set up auto-refresh
+            setupAutoRefresh();
+
+            // show success
+            clearMessage();
+        } catch (err) {
+            console.error(err);
+            showMessage(err.message || 'An error occurred.');
+        } finally {
+            loader.classList.add('hidden');
+        }
+    }
+
+    function normalizeTicker(t) { if (!t) return ''; t = t.trim(); if (!t.includes('.NS') && !t.includes('.BO') && !t.includes('.NS')) { // default to NSE
+            // if just a company symbol, append .NS
+            return t.replace(/\s+/g, '').toUpperCase() + '.NS';
+        }
+        return t.replace(/\s+/g,'').toUpperCase(); }
+
+    function displayStockDetails(details) {
+        stockName.textContent = details.longName || details.shortName || 'N/A';
+        stockTicker.textContent = details.symbol || details.ticker || lastTickerSearched || 'N/A';
+        const price = details.currentPrice != null ? (currencySelect.value==='INR' ? `₹ ${Number(details.currentPrice).toFixed(2)}` : `$ ${Number(details.currentPrice).toFixed(2)}`) : 'N/A';
+        currentPriceEl.textContent = price;
+        exchangeEl.textContent = details.exchange || 'NSE';
+        sectorEl.textContent = details.sector || 'N/A';
+        countryEl.textContent = details.country || 'India';
+        descriptionEl.textContent = details.description || 'No summary available.';
+        priceChangeEl.textContent = details.change ? `${details.change.toFixed(2)} (${details.changePercent? (details.changePercent.toFixed(2)+'%') : ''})` : '--';
+        if (details.change && details.change > 0) { liveDot.classList.remove('negative'); liveDot.classList.add('positive'); } else { liveDot.classList.remove('positive'); liveDot.classList.add('negative'); }
+        // market metrics
+        document.getElementById('marketCap').textContent = formatNumber(details.marketCap);
+        document.getElementById('peRatio').textContent = details.peRatio || '--';
+        document.getElementById('revenue').textContent = details.revenueTTM ? formatNumber(details.revenueTTM) : '--';
+    }
+
+    function computePerformanceCards(historical){
+        if (!historical || historical.length < 2) return;
+        const getPct = (a,b) => ((b-a)/a)*100;
+        const last = historical[historical.length-1].Close;
+        const oneDay = historical[historical.length-2].Close;
+        ch1d.textContent = (getPct(oneDay,last)).toFixed(2) + '%';
+
+        // rough 1W/1M: find index offsets
+        const idx1w = Math.max(0, historical.length-5);
+        const idx1m = Math.max(0, historical.length-22);
+        const p1w = historical[idx1w].Close; const p1m = historical[idx1m].Close;
+        ch1w.textContent = ((last-p1w)/p1w*100).toFixed(2) + '%';
+        ch1m.textContent = ((last-p1m)/p1m*100).toFixed(2) + '%';
+        // 52w range
+        const all = historical.map(h=>h.Close);
+        const hi = Math.max(...all); const lo = Math.min(...all);
+        range52.textContent = `${lo.toFixed(2)} - ${hi.toFixed(2)}`;
+    }
+
+    function displayNews(news){
+        newsList.innerHTML = '';
+        news.articles.slice(0,5).forEach(a => {
+            const d = document.createElement('div'); d.className='mb-2'; d.innerHTML = `<a href="${a.url||'#'}" target="_blank" class="text-sm text-gray-200 hover:underline">${a.title}</a><div class="text-xs text-gray-400">${a.source?.name||''}</div>`; newsList.appendChild(d);
+        });
+        const s = news.sentimentScore || 0;
+        sentimentSummary.textContent = s > 0 ? 'Positive' : s < 0 ? 'Negative' : 'Neutral';
+    }
+
+    // Compare two stocks and overlay on the chart
+    async function runCompare(t1, t2){
+        try {
+            const p1 = await fetchPrediction(t1, rangeSelect.value);
+            const p2 = await fetchPrediction(normalizeTicker(t2), rangeSelect.value);
+            const h1 = p1.historical.map(x=>x.Close); const d1 = p1.historical.map(x=>x.Date);
+            const h2 = p2.historical.map(x=>x.Close); const d2 = p2.historical.map(x=>x.Date);
+            // align by dates (simple approach: use shorter common prefix)
+            const minLen = Math.min(h1.length, h2.length);
+            const labels = d1.slice(-minLen);
+            const ds1 = h1.slice(-minLen); const ds2 = h2.slice(-minLen);
+            // add to chart as overlays
+            const datasets = myChart.data.datasets.slice(0,2); // keep historical+forecast
+            datasets.push({ label: t1+' (hist)', data: ds1, borderColor:'rgb(99,102,241)', tension:0.1, pointRadius:0 });
+            datasets.push({ label: t2+' (hist)', data: ds2, borderColor:'rgb(240,171,10)', tension:0.1, pointRadius:0 });
+            myChart.data.labels = labels; myChart.data.datasets = datasets; myChart.update();
+        } catch(e){ showMessage('Compare failed: '+e.message); }
+    }
+
+    // Auto-refresh setup
+    function setupAutoRefresh(){
+        if (autoRefreshTimer) { clearInterval(autoRefreshTimer); autoRefreshTimer = null; }
+        const secs = Number(autoRefreshSelect.value);
+        if (secs > 0 && lastTickerSearched) {
+            autoRefreshTimer = setInterval(()=> performSearch(lastTickerSearched), secs*1000);
+        }
+    }
+
+    // ===== Watchlist UI =====
+    function openWatchlist(){ watchModal.classList.remove('hidden'); renderWatchItems(); }
+    function closeWatchlist(){ watchModal.classList.add('hidden'); }
+    function renderWatchItems(){
+        const list = getWatchlist(); watchItems.innerHTML='';
+        if (!list.length) { watchItems.innerHTML = '<div class="text-gray-400">Watchlist empty. Add stocks using the ⭐ button.</div>'; return; }
+        list.forEach(t => {
+            const card = document.createElement('div'); card.className='bg-gray-700 p-3 rounded flex justify-between items-center';
+            card.innerHTML = `<div><div class="font-semibold">${t}</div><div class="text-xs text-gray-400">Click to view</div></div>`;
+            card.onclick = () => { tickerInput.value = t; performSearch(t); closeWatchlist(); };
+            const btns = document.createElement('div');
+            const rem = document.createElement('button'); rem.className='bg-red-600 py-1 px-2 rounded text-xs ml-2'; rem.textContent='Remove'; rem.onclick = (e)=>{ e.stopPropagation(); removeFromWatchlist(t); renderWatchItems(); };
+            card.appendChild(rem); watchItems.appendChild(card);
+        });
+    }
+
+    // ===== Voice input (basic) =====
+    const voiceBtn = document.getElementById('voiceBtn');
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recog = new SpeechRecognition(); recog.lang = 'en-IN'; recog.interimResults = false; recog.maxAlternatives = 1;
+        voiceBtn.onclick = () => { try { recog.start(); } catch(e){} };
+        recog.onresult = (evt) => { const text = evt.results[0][0].transcript; tickerInput.value = text.trim(); performSearch(text.trim()); };
+    } else { voiceBtn.style.opacity = 0.4; voiceBtn.title = 'Voice not supported in this browser'; }
+
+    // ===== Event bindings =====
+    searchBtn.addEventListener('click', ()=> performSearch(tickerInput.value.trim()));
+    tickerInput.addEventListener('keyup', (e)=> { if (e.key === 'Enter') performSearch(tickerInput.value.trim()); });
+    addWatchBtn.addEventListener('click', ()=> { const t = normalizeTicker(tickerInput.value); if (!t) return showMessage('Enter ticker to add'); addToWatchlist(t); showMessage('Added to watchlist', false); setTimeout(clearMessage,2000); });
+    openWatchBtn.addEventListener('click', openWatchlist);
+    closeWatchBtn.addEventListener('click', closeWatchlist);
+    autoRefreshSelect.addEventListener('change', setupAutoRefresh);
+    rangeSelect.addEventListener('change', ()=> { if (lastTickerSearched) performSearch(lastTickerSearched); });
+    currencySelect.addEventListener('change', ()=> { if (lastTickerSearched) performSearch(lastTickerSearched); });
+
+    // Run a default sample if user opens page with nothing
+    (function init(){ const defaultTicker = 'RELIANCE.NS'; tickerInput.value = defaultTicker; performSearch(defaultTicker); })();
+
+    </script>
+
+    <!--
+       Backend notes (important):
+       - /stock_details?ticker=... should return JSON with fields like: longName, symbol, currentPrice, change, changePercent, exchange, sector, country, description, marketCap, peRatio, revenueTTM
+       - /predict?ticker=...&range=1y should return { historical: [{Date:'YYYY-MM-DD', Close:float}, ...], forecast: [{Date:'YYYY-MM-DD', Close:float}, ...], model: 'LSTM', confidence: '85' }
+       - For production, implement news & sentiment analysis on backend (avoid exposing API keys in frontend)
+       - Add CORS headers to your Flask backend to allow requests from this frontend origin
+    -->
+</body>
+</html>
